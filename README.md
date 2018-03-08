@@ -1,2 +1,3 @@
-# copyplash-web-service
-Web service providing a game session, gathering and syncing data
+# Copyplash Web Service
+
+A web service developed in Go (Golang), with the Gin Web Framework.

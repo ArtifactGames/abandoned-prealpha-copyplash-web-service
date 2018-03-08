@@ -1,0 +1,6 @@
+# Go build executables
+*.exe # Windows
+copyplash-web-service # Other
+
+#SQLite database
+data.db
