@@ -2,13 +2,13 @@ package main
 
 import (
 	"strconv"
-
 	"github.com/ArtifactGames/copyplash-web-service/database"
+	"github.com/ArtifactGames/copyplash-web-service/response"
 	"github.com/gin-gonic/gin"
 )
 
 const (
-	serverPort = ":8080"
+	serverPort = ":8081"
 )
 
 func createLobby(c *gin.Context) {
@@ -23,14 +23,26 @@ func createLobby(c *gin.Context) {
 func enterLobby(c *gin.Context) {
 	// THIS IS NOT JSON. IT IS A FORM
 	// Send a post form with lobbyID key in it
-	clientID := c.PostForm("clientID")
-	lobbyPassword, _ := strconv.Atoi(c.PostForm("lobbyPassword"))
+	clientID, hasClientId := c.GetPostForm("clientID")
+	lobbyPassword, hasLobbyPassword := c.GetPostForm("lobbyPassword")
 
-	database.EnterLobby(clientID, lobbyPassword)
+	if !hasClientId || !hasLobbyPassword {
+		response.BadRequest(c)
+		return
+	}
 
-	c.JSON(200, gin.H{
-		"message": "Entered lobby correctly",
-	})
+	cleanLobbyPassword, err := strconv.Atoi(lobbyPassword);
+	if err != nil {
+		response.BadRequest(c);
+		return
+	}
+
+	if success := database.EnterLobby(clientID, cleanLobbyPassword); !success {
+		response.BadRequest(c);
+		return
+	}
+
+	response.Success(c, "Entered lobby correctly")
 }
 
 func destroyLobby(c *gin.Context) {
