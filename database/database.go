@@ -2,7 +2,7 @@ package database
 
 import (
 	"database/sql"
-	"fmt"
+	"log"
 	"math/rand"
 
 	_ "github.com/mattn/go-sqlite3" //SQLite driver
@@ -59,17 +59,33 @@ func DestroyLobby(id int) {
 }
 
 // EnterLobby destroys an already created lobby
-func EnterLobby(clientID string, password int) {
-	db, _ := sql.Open("sqlite3", databaseFile)
+func EnterLobby(clientID string, password int) (bool) {
+	db, err := sql.Open("sqlite3", databaseFile)
 
-	row := db.QueryRow("SELECT id FROM lobbies WHERE password = $1", password)
+	if err != nil {
+		log.Println("cannot open the database")
+		return false
+	}
+	
 	var lobbyID int
-	row.Scan(&lobbyID)
-	fmt.Println(lobbyID)
+	err = db.QueryRow("SELECT id FROM lobbies WHERE password = $1", password).Scan(&lobbyID)
+	if err != nil {
+		return false
+	}
 
-	fmt.Println(clientID, lobbyID)
-	statement, _ := db.Prepare("INSERT INTO lobby_player(cookie_id, lobby_id) values(?, ?)")
-	statement.Exec(clientID, lobbyID)
+	statement, err := db.Prepare("INSERT INTO lobby_player(cookie_id, lobby_id) values(?, ?)");
+	if err != nil {
+		log.Println("Cannot prepare the insert query")
+		return false
+	}
+
+	_, err = statement.Exec(clientID, lobbyID)
+	
+	if err != nil {
+		log.Println("Cannot insert the player")
+	}
+
+	return err == nil
 }
 
 // func borralla() {
