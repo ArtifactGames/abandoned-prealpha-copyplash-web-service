@@ -16,16 +16,20 @@ A web service developed in Kotlin, with the Spring Boot Framework.
    cd copyplash-web-service
    ```
  - launch:
+ 
    ```bash
    # with Gradle cli
    gradle bootRun
-
+   ```
+   ```
    # with Gradle wrapper
    ./gradlew bootRun
-
+   ```
+   ```
    # On windows
    ./gradlew.bat bootRun
-
+   ```
+   ```
    # Use a different port
     SERVER_PORT=8081 gradle bootRun
    ```
