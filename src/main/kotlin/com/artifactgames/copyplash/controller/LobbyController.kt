@@ -29,9 +29,15 @@ class LobbyController {
     val questionsDir = "copyplash-archive"
     val repoUrl = "https://github.com/ArtifactGames"
     val locale = "en_US"
+    var questionList: List<Question> = Collections.emptyList()
 
     @PostConstruct
     fun init() {
+        fetchQuestionRepository()
+        questionList = fetchQuestionsList()
+    }
+
+    fun fetchQuestionRepository() {
         try {
             Git.open(File("$questionsDir/.git"))
                     .pull()
@@ -43,7 +49,7 @@ class LobbyController {
         }
     }
 
-    fun getQuestionsList(): List<Question> {
+    fun fetchQuestionsList(): List<Question> {
         val reader = JsonReader(FileReader("$questionsDir/$locale/questions.json"))
         val questions: Map<String, String> = Gson().fromJson(reader, Map::class.java)
         return questions.map {
@@ -51,7 +57,7 @@ class LobbyController {
         }
     }
 
-    fun getInitialGameMode() = GameMode(GameModes.INSPIRATION, States.START, getQuestionsList())
+    fun getInitialGameMode() = GameMode(GameModes.INSPIRATION, States.START, questionList)
 
     @GetMapping("/lobby-create")
     fun create(): Lobby {
