@@ -1,30 +1,26 @@
 package com.artifactgames.copyplash.controller
 
+import com.artifactgames.copyplash.WebSocketConfig
+import com.artifactgames.copyplash.model.Lobby
+import com.artifactgames.copyplash.model.Question
 import com.google.gson.Gson
 import com.google.gson.stream.JsonReader
 import org.eclipse.jgit.api.Git
-import org.springframework.web.bind.annotation.*
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
 import java.io.File
-import java.util.*
 import java.io.FileReader
+import java.util.*
 import javax.annotation.PostConstruct
 
-
-data class Lobby(val id: UUID, val password: Int, val gameMode: GameMode)
-data class GameMode(val gameMode: GameModes, val state: States, val questionList: List<Question>)
-data class Question(val id: String, val description: String)
-
-enum class GameModes {
-    INSPIRATION,
-}
-
-enum class States(state: Int) {
-    START(0),
-
-}
-
-@RestController("lobby/")
+@RestController
 class LobbyController {
+
+    @Autowired
+    lateinit var websocketManager: WebSocketConfig
 
     val questionsDir = "copyplash-archive"
     val repoUrl = "https://github.com/ArtifactGames"
@@ -57,13 +53,15 @@ class LobbyController {
         }
     }
 
-    fun getInitialGameMode() = GameMode(GameModes.INSPIRATION, States.START, questionList)
 
     @GetMapping("/lobby-create")
-    fun create(): Lobby {
-        val id = UUID.randomUUID()
-        val password = Math.abs(Random().nextInt(8999) + 1000)
-        return Lobby(id, password, getInitialGameMode())
+    fun create(): ResponseEntity<Lobby> {
+        val lobby = websocketManager.getLobby()
+        if (lobby != null) {
+            return ResponseEntity.ok(lobby)
+        }
+
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(null)
     }
 
 }
