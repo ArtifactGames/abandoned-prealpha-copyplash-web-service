@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.io.File
 import java.io.FileReader
@@ -55,13 +56,19 @@ class LobbyController {
 
 
     @GetMapping("/lobby-create")
-    fun create(): ResponseEntity<Lobby> {
-        val lobby = websocketManager.getLobby()
-        if (lobby != null) {
-            return ResponseEntity.ok(lobby)
-        }
+    fun create(): ResponseEntity<*> {
+        val lobby = websocketManager.getLobby() ?: return errorResponse(HttpStatus.NOT_ACCEPTABLE)
 
-        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(null)
+        return ResponseEntity.ok(lobby)
     }
+
+    @GetMapping("/lobby-enter")
+    fun enter(@RequestParam(defaultValue="0") password: Int): ResponseEntity<*> {
+        val lobby = websocketManager.enterLobby(password) ?: return errorResponse(HttpStatus.BAD_REQUEST)
+
+        return ResponseEntity.ok(lobby)
+    }
+
+    private fun errorResponse(status: HttpStatus): ResponseEntity<*> = ResponseEntity.status(status).body(null)
 
 }

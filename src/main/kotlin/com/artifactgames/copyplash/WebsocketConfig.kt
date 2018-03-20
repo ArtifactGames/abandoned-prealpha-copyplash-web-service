@@ -46,6 +46,16 @@ class WebSocketConfig : WebSocketConfigurer {
         return null
     }
 
+    fun enterLobby(password: Int): Lobby? {
+        if(password > 0) {
+            return lobbies
+                    .filterKeys { it.password == password }
+                    .map { it.key }
+                    .getOrNull(0)
+        }
+        return null
+    }
+
     private fun genPassword() = Math.abs(Random().nextInt(8999) + 1000)
 
 
