@@ -30,7 +30,7 @@ class WebSocketConfig : WebSocketConfigurer {
 
             val id = UUID.randomUUID()
             // TODO add handshake interceptor to avoid unexpected connections or visitors to the websockets
-            registry.addHandler(ChannelController(), id.toString())
+            registry.addHandler(ChannelController(), id.toString()).setAllowedOrigins("*")
             lobbies[Lobby(id, 0, getInitialGameMode())] = true
         }
     }
