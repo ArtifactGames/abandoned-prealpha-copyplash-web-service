@@ -1,7 +1,6 @@
 package com.artifactgames.copyplash.controller
 
 import com.artifactgames.copyplash.WebSocketConfig
-import com.artifactgames.copyplash.model.Lobby
 import com.artifactgames.copyplash.model.Question
 import com.google.gson.Gson
 import com.google.gson.stream.JsonReader
@@ -9,9 +8,7 @@ import org.eclipse.jgit.api.Git
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import java.io.File
 import java.io.FileReader
 import java.util.*
@@ -62,8 +59,12 @@ class LobbyController {
         return ResponseEntity.ok(lobby)
     }
 
-    @GetMapping("/lobby-enter")
-    fun enter(@RequestParam(defaultValue="0") password: Int): ResponseEntity<*> {
+
+    data class LobbyEnterRequest(val password: Int)
+
+    @PostMapping("/lobby-enter")
+    fun enter(@RequestBody req: LobbyEnterRequest?): ResponseEntity<*> {
+        val password = req?.password ?: 0
         val lobby = websocketManager.enterLobby(password) ?: return errorResponse(HttpStatus.BAD_REQUEST)
 
         return ResponseEntity.ok(lobby)
