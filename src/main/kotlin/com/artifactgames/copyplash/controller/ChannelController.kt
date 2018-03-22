@@ -39,30 +39,37 @@ class ChannelController: TextWebSocketHandler() {
     }
 
     override fun handleMessage(session: WebSocketSession?, message: WebSocketMessage<*>?) {
-
-        val response = message?.let { processMessage(message) }
-
-        response?.let {
-            session?.sendMessage(response)
-        }
+        message
+                ?.mapMessageToCommandResponse()
+                ?.mapToCommandResponse()
+                ?.serialize()
+                ?.let {
+                    session?.sendMessage(it)
+                }
     }
 
-    private fun processMessage(message: WebSocketMessage<*>): TextMessage? {
-        return try {
-            val command = gson.fromJson(message.payload.toString(), CommandRequest::class.java)
-            processCommand(command)
+    private fun CommandResponse.serialize(): TextMessage? =
+        try {
+            TextMessage(gson.toJson(this))
+        } catch(e: Exception) {
+            null
+        }
+
+
+    private fun WebSocketMessage<*>.mapMessageToCommandResponse(): CommandRequest? =
+        try {
+            gson.fromJson(payload.toString(), CommandRequest::class.java)
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
-    }
 
-    private fun processCommand(command: CommandRequest): TextMessage? {
-        return when(command.action) {
-            CommandAction.SET_NICK -> TextMessage(gson.toJson(CommandResponse(CommandAction.SET_NICK_SUCCESS)))
+    private fun CommandRequest.mapToCommandResponse(): CommandResponse? =
+        when(action) {
+            CommandAction.SET_NICK -> CommandResponse(CommandAction.SET_NICK_SUCCESS)
             else -> {
                 null
             }
         }
-    }
+
 }
