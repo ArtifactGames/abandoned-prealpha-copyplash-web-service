@@ -29,6 +29,7 @@ class ChannelController: TextWebSocketHandler() {
         println("ConnectionClosed: ${session.toString()}")
         session?.apply {
             playerList.remove(Player(id))
+            sendPlayerListToHost()
         }
     }
 
