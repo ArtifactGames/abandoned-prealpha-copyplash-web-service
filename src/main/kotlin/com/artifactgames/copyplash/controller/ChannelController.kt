@@ -84,9 +84,16 @@ class ChannelController: TextWebSocketHandler() {
         }
 
     private fun sendPlayerListToHost() {
-        val playerListTextMessage = TextMessage(gson.toJson(playerList.keys.toList()))
+        val playerListTextMessage = TextMessage(playerList.getValidPlayers().toJson())
         host!!.sendMessage(playerListTextMessage)
     }
+
+    private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
+        .filterKeys { key -> key.nick.isNotEmpty() }
+        .keys
+        .toList()
+
+    private fun List<Player>.toJson(): String = gson.toJson(this)
 
     val processSetNick = {command: CommandRequest, session: WebSocketSession? ->
         session?.run {
