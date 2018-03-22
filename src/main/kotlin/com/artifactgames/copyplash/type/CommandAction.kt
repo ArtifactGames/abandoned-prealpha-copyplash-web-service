@@ -9,8 +9,10 @@ enum class CommandAction {
     @SerializedName("1")
     RETRIEVE,
     @SerializedName("2")
+    UPDATE_PLAYERS,
+    @SerializedName("10000")
     SET_NICK,
-    @SerializedName("3")
+    @SerializedName("10001")
     SET_NICK_SUCCESS,
 
 }
