@@ -9,3 +9,6 @@ data class Player(val id: String, val nick: String = "") {
         return (other is Player) && other.id == id
     }
 }
+
+
+data class PlayerList(val players: List<Player>)

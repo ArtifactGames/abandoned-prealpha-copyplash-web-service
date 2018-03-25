@@ -3,6 +3,7 @@ package com.artifactgames.copyplash.controller
 import com.artifactgames.copyplash.model.CommandRequest
 import com.artifactgames.copyplash.model.CommandResponse
 import com.artifactgames.copyplash.model.Player
+import com.artifactgames.copyplash.model.PlayerList
 import com.artifactgames.copyplash.type.CommandAction
 import com.google.gson.Gson
 import org.springframework.stereotype.Component
@@ -84,7 +85,7 @@ class ChannelController: TextWebSocketHandler() {
         }
 
     private fun sendPlayerListToHost() {
-        val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, playerList.getValidPlayers().toJson())
+        val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
         val playerListTextMessage = TextMessage(updatePlayersResponse.toJson())
         host!!.sendMessage(playerListTextMessage)
     }
