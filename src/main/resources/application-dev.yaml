@@ -1,0 +1,5 @@
+debug: false
+trace: false
+server:
+  port: 8080
+allowedOrigins: '*' # to set multiple origins: 'http://cpp.artifact.games/,http://plash.artifact.games/'
