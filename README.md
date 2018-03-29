@@ -33,3 +33,10 @@ A web service developed in Kotlin, with the Spring Boot Framework.
    # Use a different port
     SERVER_PORT=8081 gradle bootRun
    ```
+
+### Running with configuration profile
+```bash
+SPRING_PROFILES_ACTIVE=[prod|dev] gradle bootRun
+```
+
+The default profile is `dev`, you can check the profile configuration inside the `src/main/resources/application-*.yaml` files
