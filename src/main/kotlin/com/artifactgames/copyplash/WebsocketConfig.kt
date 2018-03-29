@@ -5,6 +5,7 @@ import com.artifactgames.copyplash.model.GameMode
 import com.artifactgames.copyplash.model.Lobby
 import com.artifactgames.copyplash.type.GameModes
 import com.artifactgames.copyplash.type.States
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.config.annotation.EnableWebSocket
@@ -23,6 +24,9 @@ class WebSocketConfig : WebSocketConfigurer {
 
     val lobbies : HashMap<Lobby, Boolean> = HashMap()
 
+    @Value("#{'\${allowedOrigins}'.split(',')}")
+    private val allowedOrigins: List<String> = listOf()
+
     fun getInitialGameMode() = GameMode(GameModes.INSPIRATION, States.START)
 
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
@@ -30,7 +34,7 @@ class WebSocketConfig : WebSocketConfigurer {
 
             val id = UUID.randomUUID()
             // TODO add handshake interceptor to avoid unexpected connections or visitors to the websockets
-            registry.addHandler(ChannelController(), id.toString()).setAllowedOrigins("*")
+            registry.addHandler(ChannelController(), id.toString()).setAllowedOrigins(*allowedOrigins.toTypedArray())
             lobbies[Lobby(id, 0, getInitialGameMode())] = true
         }
     }
