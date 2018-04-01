@@ -21,6 +21,7 @@ class ChannelController: TextWebSocketHandler() {
     val gson = Gson()
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
+    var gameMaster: Pair<Player, WebSocketSession>? = null
 
     override fun handleTransportError(session: WebSocketSession?, exception: Throwable?) {
         println("Error: ${exception.toString()}")
@@ -41,6 +42,7 @@ class ChannelController: TextWebSocketHandler() {
         } else {
             session?.apply {
                 playerList[Player(id)] = this
+                gameMaster = gameMaster ?: Player(id) to this
             }
         }
     }
@@ -62,7 +64,7 @@ class ChannelController: TextWebSocketHandler() {
         try {
             commandRequest.getProcessor()(session)
         } catch (e:Exception) {
-            e.printStackTrace();
+            e.printStackTrace()
         }
     }
 
@@ -81,14 +83,24 @@ class ChannelController: TextWebSocketHandler() {
                 processSetNick(this, session)
                 sendPlayerListToHost()
             }
+            CommandAction.LAUNCH_GAME -> { session: WebSocketSession? ->
+                session?.run{
+                    if(isGameMaster()) {
+                        host!!.sendCommand(CommandResponse(CommandAction.START_GAME))
+                    }
+                }
+            }
             else -> { _ -> }
         }
 
+    private fun WebSocketSession.isGameMaster() : Boolean = gameMaster?.second?.id == id  ?: false
     private fun sendPlayerListToHost() {
         val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
-        val playerListTextMessage = TextMessage(updatePlayersResponse.toJson())
-        host!!.sendMessage(playerListTextMessage)
+        host!!.sendCommand(updatePlayersResponse)
     }
+
+    private fun WebSocketSession.sendCommand(command: CommandResponse) = sendMessage(TextMessage(command.toJson()))
+
 
     private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
         .filterKeys { key -> key.nick.isNotEmpty() }
