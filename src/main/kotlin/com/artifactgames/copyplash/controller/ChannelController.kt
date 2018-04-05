@@ -1,18 +1,14 @@
 package com.artifactgames.copyplash.controller
 
-import com.artifactgames.copyplash.model.CommandRequest
-import com.artifactgames.copyplash.model.CommandResponse
-import com.artifactgames.copyplash.model.Player
-import com.artifactgames.copyplash.model.PlayerList
+import com.artifactgames.copyplash.model.*
 import com.artifactgames.copyplash.type.CommandAction
-import com.google.gson.Gson
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.MessageSource
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
-import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
-import kotlin.collections.HashMap
 
 @Component
 class ChannelController: TextWebSocketHandler() {
@@ -56,16 +52,6 @@ class ChannelController: TextWebSocketHandler() {
     private fun CommandRequest.process(session: WebSocketSession?) = apply {
         getProcessor()(session)
     }
-    private fun CommandResponse.sendResponse(session: WebSocketSession?) = apply {
-        session?.sendMessage(serialize())
-    }
-
-    private fun WebSocketMessage<*>.mapMessageToCommandRequest(): CommandRequest? =
-        try {
-            gson.fromJson(payload.toString(), CommandRequest::class.java)
-        } catch (e: Exception) {
-            null
-        }
 
     private fun CommandRequest.getProcessor(): (session: WebSocketSession?) -> Any? =
         when(action) {
@@ -79,20 +65,6 @@ class ChannelController: TextWebSocketHandler() {
             else -> { _ -> }
         }
 
-    private fun sendPlayerListToHost() {
-        val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
-        host!!.sendCommand(updatePlayersResponse)
-    }
-
-    private fun WebSocketSession.sendCommand(command: CommandResponse) = command.serialize()?.apply { sendMessage(this) }
-
-
-    private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
-        .filterKeys { key -> key.nick.isNotEmpty() }
-        .keys
-        .toList()
-
-    private fun <T> T.toJson(): String = gson.toJson(this)
 
     val processSetNick = {command: CommandRequest, session: WebSocketSession? ->
         session?.run {
@@ -110,11 +82,20 @@ class ChannelController: TextWebSocketHandler() {
             }
         }
 
-    private fun CommandResponse.serialize(): TextMessage? =
-        try {
-            TextMessage(gson.toJson(this))
-        } catch(e: Exception) {
-            null
-        }
+    private fun sendPlayerListToHost() {
+        val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
+        host!!.sendCommand(updatePlayersResponse)
+    }
 
+    private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
+            .filterKeys { key -> key.nick.isNotEmpty() }
+            .keys
+            .toList()
+
+
+    private fun WebSocketSession.sendCommand(command: CommandResponse) = command.serialize()?.apply { sendMessage(this) }
+
+    private fun CommandResponse.sendResponse(session: WebSocketSession?) = apply {
+        session?.sendMessage(serialize())
+    }
 }
