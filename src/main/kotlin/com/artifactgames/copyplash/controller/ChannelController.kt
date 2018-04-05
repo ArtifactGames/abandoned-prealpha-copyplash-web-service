@@ -47,31 +47,23 @@ class ChannelController: TextWebSocketHandler() {
 
     override fun handleMessage(session: WebSocketSession?, message: WebSocketMessage<*>?) {
         message
-                ?.mapMessageToCommandResponse()
-                ?.also {
-                    process(it, session)
-                }
+                ?.mapMessageToCommandRequest()
+                ?.process(session)
                 ?.mapToCommandResponse()
-                ?.serialize()
-                ?.let {
-                    session?.sendMessage(it)
-                }
+                ?.sendResponse(session)
     }
 
-    private fun process(commandRequest: CommandRequest, session: WebSocketSession?) {
-        try {
-            commandRequest.getProcessor()(session)
-        } catch (e:Exception) {
-            e.printStackTrace();
-        }
+    private fun CommandRequest.process(session: WebSocketSession?) = apply {
+        getProcessor()(session)
+    }
+    private fun CommandResponse.sendResponse(session: WebSocketSession?) = apply {
+        session?.sendMessage(serialize())
     }
 
-
-    private fun WebSocketMessage<*>.mapMessageToCommandResponse(): CommandRequest? =
+    private fun WebSocketMessage<*>.mapMessageToCommandRequest(): CommandRequest? =
         try {
             gson.fromJson(payload.toString(), CommandRequest::class.java)
         } catch (e: Exception) {
-            e.printStackTrace()
             null
         }
 
@@ -86,9 +78,11 @@ class ChannelController: TextWebSocketHandler() {
 
     private fun sendPlayerListToHost() {
         val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
-        val playerListTextMessage = TextMessage(updatePlayersResponse.toJson())
-        host!!.sendMessage(playerListTextMessage)
+        host!!.sendCommand(updatePlayersResponse)
     }
+
+    private fun WebSocketSession.sendCommand(command: CommandResponse) = command.serialize()?.apply { sendMessage(this) }
+
 
     private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
         .filterKeys { key -> key.nick.isNotEmpty() }
