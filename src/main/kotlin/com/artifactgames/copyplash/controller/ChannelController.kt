@@ -14,7 +14,9 @@ import org.springframework.web.socket.handler.TextWebSocketHandler
 class ChannelController: TextWebSocketHandler() {
 
 
-    val gson = Gson()
+    @Autowired
+    lateinit var messageSource: MessageSource
+
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
     var gameSettings: GameSettings? = null
@@ -46,50 +48,41 @@ class ChannelController: TextWebSocketHandler() {
         message
                 ?.mapMessageToCommandRequest()
                 ?.process(session)
-                ?.mapToCommandResponse()
-                ?.sendResponse(session)
+                ?.send(session)
     }
 
-    private fun CommandRequest.process(session: WebSocketSession?) = apply {
-        getProcessor()(session)
-    }
-
-    private fun CommandRequest.getProcessor(): (session: WebSocketSession?) -> Any? =
+    private fun CommandRequest.process(session: WebSocketSession?): CommandResponse? = run {
         when(action) {
-            CommandAction.SET_NICK -> {session: WebSocketSession? ->
-                processSetNick(this, session)
-                sendPlayerListToHost()
-            }
-            CommandAction.START_GAME -> { _: WebSocketSession? ->
-                processStartGame(this)
-            }
-            else -> { _ -> }
+            CommandAction.SET_NICK -> processSetNick(this, session)
+            CommandAction.START_GAME -> processStartGame(this)
+            else -> { null }
         }
+    }
 
-
-    val processSetNick = {command: CommandRequest, session: WebSocketSession? ->
+    private fun processSetNick(command: CommandRequest, session: WebSocketSession?) =
         session?.run {
             val player = Player(id, command.payload ?: throw Exception())
             playerList.remove(player)
             playerList[player] = session
-        }
-    }
 
-    val processStartGame = { command: CommandRequest ->
+            sendPlayerListToHost()
+            CommandResponse(CommandAction.SET_NICK_SUCCESS)
+        }
+
+
+    private fun processStartGame(command: CommandRequest): CommandResponse? {
         gameSettings = command.deserialize<GameSettings>()
+        return null
     }
-
-    private fun CommandRequest.mapToCommandResponse(): CommandResponse? =
-        when(action) {
-            CommandAction.SET_NICK -> CommandResponse(CommandAction.SET_NICK_SUCCESS)
-            else -> {
-                null
-            }
-        }
 
     private fun sendPlayerListToHost() {
-        val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
-        host!!.sendCommand(updatePlayersResponse)
+        host?.apply {
+            val updatePlayersResponse = CommandResponse(
+                    CommandAction.UPDATE_PLAYERS,
+                    PlayerList(playerList.getValidPlayers()).toJson()
+            )
+            updatePlayersResponse.send(this)
+        }
     }
 
     private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
@@ -97,10 +90,7 @@ class ChannelController: TextWebSocketHandler() {
             .keys
             .toList()
 
-
-    private fun WebSocketSession.sendCommand(command: CommandResponse) = command.serialize()?.apply { sendMessage(this) }
-
-    private fun CommandResponse.sendResponse(session: WebSocketSession?) = apply {
-        session?.sendMessage(serialize())
+    private fun CommandResponse.send(session: WebSocketSession?) = serialize()?.apply {
+        session?.sendMessage(this)
     }
 }

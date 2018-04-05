@@ -1,6 +1,5 @@
 package com.artifactgames.copyplash.model
 
-import com.artifactgames.copyplash.type.CommandAction
 import com.google.gson.Gson
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketMessage
@@ -30,12 +29,4 @@ fun CommandResponse.serialize(): TextMessage? =
         TextMessage(gson.toJson(this))
     } catch(e: Exception) {
         null
-    }
-
-fun CommandRequest.mapToCommandResponse(): CommandResponse? =
-    when(action) {
-        CommandAction.SET_NICK -> CommandResponse(CommandAction.SET_NICK_SUCCESS)
-        else -> {
-            null
-        }
     }
