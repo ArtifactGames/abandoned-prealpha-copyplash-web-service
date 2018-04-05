@@ -10,6 +10,8 @@ enum class CommandAction {
     RETRIEVE,
     @SerializedName("2")
     UPDATE_PLAYERS,
+    @SerializedName("3")
+    START_GAME,
     @SerializedName("10000")
     SET_NICK,
     @SerializedName("10001")

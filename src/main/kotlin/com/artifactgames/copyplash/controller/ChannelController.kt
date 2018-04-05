@@ -73,6 +73,9 @@ class ChannelController: TextWebSocketHandler() {
                 processSetNick(this, session)
                 sendPlayerListToHost()
             }
+            CommandAction.START_GAME -> { session: WebSocketSession? ->
+
+            }
             else -> { _ -> }
         }
 
