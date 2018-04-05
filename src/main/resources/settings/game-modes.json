@@ -1,0 +1,12 @@
+{
+  "questions": {
+    "numberOfRounds": 1,
+    "rounds": [
+      {
+        "title": "round.one.title",
+        "description": "round.one.description",
+        "timeout": 60000
+      }
+    ]
+  }
+}
