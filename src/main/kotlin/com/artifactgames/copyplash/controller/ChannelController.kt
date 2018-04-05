@@ -9,6 +9,7 @@ import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import java.util.*
 
 @Component
 class ChannelController: TextWebSocketHandler() {
@@ -17,9 +18,15 @@ class ChannelController: TextWebSocketHandler() {
     @Autowired
     lateinit var messageSource: MessageSource
 
+    @Autowired
+    lateinit var gameModes: List<GameMode>
+
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
     var gameSettings: GameSettings? = null
+    var currentGameMode: GameMode? = null
+    var currentRound: Int = 0
+    var currentLocale: Locale? = null
 
     override fun handleTransportError(session: WebSocketSession?, exception: Throwable?) {
         println("Error: ${exception.toString()}")
@@ -54,8 +61,24 @@ class ChannelController: TextWebSocketHandler() {
     private fun CommandRequest.process(session: WebSocketSession?): CommandResponse? = run {
         when(action) {
             CommandAction.SET_NICK -> processSetNick(this, session)
-            CommandAction.START_GAME -> processStartGame(this)
+            CommandAction.START_GAME -> processStartGame()
             else -> { null }
+        }
+    }
+
+    private fun CommandRequest.processStartGame(): CommandResponse? {
+        gameSettings = deserialize<GameSettings>()?.apply {
+            currentGameMode = gameModes.find { it.mode == gameMode.mode }
+            currentLocale = Locale(locale)
+        }
+
+        return currentGameMode?.rounds?.getOrNull(currentRound)?.run {
+            val round = Round(0,
+                    messageSource.getMessage(title, null, currentLocale ?: Locale.getDefault()),
+                    messageSource.getMessage(description, null, currentLocale ?: Locale.getDefault()),
+                    timeout
+            )
+            CommandResponse(CommandAction.SEND_ROUND_DETAILS, round.toJson())
         }
     }
 
@@ -68,12 +91,6 @@ class ChannelController: TextWebSocketHandler() {
             sendPlayerListToHost()
             CommandResponse(CommandAction.SET_NICK_SUCCESS)
         }
-
-
-    private fun processStartGame(command: CommandRequest): CommandResponse? {
-        gameSettings = command.deserialize<GameSettings>()
-        return null
-    }
 
     private fun sendPlayerListToHost() {
         host?.apply {
