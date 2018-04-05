@@ -1,12 +1,14 @@
-{
-  "questions": {
+[
+  {
+    "gameMode": 0,
     "numberOfRounds": 1,
     "rounds": [
       {
+        "position": 0,
         "title": "round.one.title",
         "description": "round.one.description",
         "timeout": 60000
       }
     ]
   }
-}
+]
