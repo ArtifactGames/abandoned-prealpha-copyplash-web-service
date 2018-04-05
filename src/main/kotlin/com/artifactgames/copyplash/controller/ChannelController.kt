@@ -17,6 +17,7 @@ class ChannelController: TextWebSocketHandler() {
     val gson = Gson()
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
+    var gameSettings: GameSettings? = null
 
     override fun handleTransportError(session: WebSocketSession?, exception: Throwable?) {
         println("Error: ${exception.toString()}")
@@ -59,8 +60,8 @@ class ChannelController: TextWebSocketHandler() {
                 processSetNick(this, session)
                 sendPlayerListToHost()
             }
-            CommandAction.START_GAME -> { session: WebSocketSession? ->
-
+            CommandAction.START_GAME -> { _: WebSocketSession? ->
+                processStartGame(this)
             }
             else -> { _ -> }
         }
@@ -72,6 +73,10 @@ class ChannelController: TextWebSocketHandler() {
             playerList.remove(player)
             playerList[player] = session
         }
+    }
+
+    val processStartGame = { command: CommandRequest ->
+        gameSettings = command.deserialize<GameSettings>()
     }
 
     private fun CommandRequest.mapToCommandResponse(): CommandResponse? =
