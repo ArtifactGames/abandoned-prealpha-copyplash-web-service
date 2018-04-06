@@ -11,6 +11,7 @@ import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import java.util.*
 import javax.annotation.PostConstruct
+import kotlin.concurrent.timer
 
 @Component
 class ChannelController: TextWebSocketHandler() {
@@ -26,6 +27,7 @@ class ChannelController: TextWebSocketHandler() {
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
     var gameSettings: GameSettings? = null
     lateinit var currentGameMode: GameMode
+    var currentRound: Round? = null
     var currentLocale: Locale? = null
 
     @PostConstruct
@@ -60,13 +62,14 @@ class ChannelController: TextWebSocketHandler() {
         message
                 ?.mapMessageToCommandRequest()
                 ?.process(session)
-                ?.send(session)
+                ?.sendTo(session)
     }
 
     private fun CommandRequest.process(session: WebSocketSession?): CommandResponse? = run {
         when(action) {
             CommandAction.SET_NICK -> processSetNick(session)
             CommandAction.START_GAME -> processStartGame()
+            CommandAction.START_ROUND -> processStartRound()
             else -> { null }
         }
     }
@@ -93,16 +96,33 @@ class ChannelController: TextWebSocketHandler() {
             println(first)
             println(second)
             response = second?.run {
-                CommandResponse(CommandAction.SEND_ROUND_DETAILS, Round(position,
+                currentRound = Round(position,
                         messageSource.getMessage(title, null, currentLocale ?: Locale.getDefault()),
                         messageSource.getMessage(description, null, currentLocale ?: Locale.getDefault()),
                         timeout
-                ).toJson())
+                )
+                CommandResponse(CommandAction.SEND_ROUND_DETAILS, currentRound.toJson())
             }
 
         }.first
 
         return response
+    }
+
+
+
+    private fun CommandRequest.processStartRound(): CommandResponse? {
+        CommandResponse(CommandAction.LAUNCH_ROUND, "[]").sendToPlayerList()
+
+        currentRound?.apply {
+            CommandResponse(CommandAction.UPDATE_COUNTER, timeout.toString()).sendTo(host)
+            timer("round-time",true, timeout, timeout, {
+                CommandResponse(CommandAction.ROUND_FINISH_HOST).sendTo(host)
+                CommandResponse(CommandAction.ROUND_FINISH_PLAYER).sendToPlayerList()
+                cancel()
+            })
+        }
+        return null
     }
 
     private fun sendPlayerListToHost() {
@@ -111,7 +131,7 @@ class ChannelController: TextWebSocketHandler() {
                     CommandAction.UPDATE_PLAYERS,
                     PlayerList(playerList.getValidPlayers()).toJson()
             )
-            updatePlayersResponse.send(this)
+            updatePlayersResponse.sendTo(this)
         }
     }
 
@@ -120,7 +140,13 @@ class ChannelController: TextWebSocketHandler() {
             .keys
             .toList()
 
-    private fun CommandResponse.send(session: WebSocketSession?) = serialize()?.apply {
+    private fun CommandResponse.sendTo(session: WebSocketSession?) = serialize()?.apply {
         session?.sendMessage(this)
+    }
+
+    private fun CommandResponse.sendToPlayerList() = serialize()?.apply {
+        playerList.getValidPlayers().forEach {
+            playerList[it]?.sendMessage(this)
+        }
     }
 }
