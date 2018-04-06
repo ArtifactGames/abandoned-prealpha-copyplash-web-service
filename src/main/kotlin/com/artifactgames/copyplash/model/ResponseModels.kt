@@ -2,7 +2,7 @@ package com.artifactgames.copyplash.model
 
 import java.util.*
 
-data class Lobby(val id: UUID, var password: Int, val gameMode: GameMode?) {
+data class Lobby(val id: UUID, var password: Int) {
     override fun hashCode(): Int {
         return id.hashCode()
     }

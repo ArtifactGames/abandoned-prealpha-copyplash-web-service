@@ -10,6 +10,7 @@ import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import java.util.*
+import javax.annotation.PostConstruct
 
 @Component
 class ChannelController: TextWebSocketHandler() {
@@ -24,9 +25,13 @@ class ChannelController: TextWebSocketHandler() {
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
     var gameSettings: GameSettings? = null
-    var currentGameMode: GameMode? = null
-    var currentRound: Int = 0
+    lateinit var currentGameMode: GameMode
     var currentLocale: Locale? = null
+
+    @PostConstruct
+    fun init() {
+        currentGameMode = gameModes.getOrNull(0) ?: throw Exception("Default game mode not found")
+    }
 
     override fun handleTransportError(session: WebSocketSession?, exception: Throwable?) {
         println("Error: ${exception.toString()}")
@@ -60,37 +65,45 @@ class ChannelController: TextWebSocketHandler() {
 
     private fun CommandRequest.process(session: WebSocketSession?): CommandResponse? = run {
         when(action) {
-            CommandAction.SET_NICK -> processSetNick(this, session)
+            CommandAction.SET_NICK -> processSetNick(session)
             CommandAction.START_GAME -> processStartGame()
             else -> { null }
         }
     }
 
-    private fun CommandRequest.processStartGame(): CommandResponse? {
-        gameSettings = deserialize<GameSettings>()?.apply {
-            currentGameMode = gameModes.find { it.mode == gameMode.mode }
-            currentLocale = Locale(locale)
-        }
-
-        return currentGameMode?.rounds?.getOrNull(currentRound)?.run {
-            val round = Round(0,
-                    messageSource.getMessage(title, null, currentLocale ?: Locale.getDefault()),
-                    messageSource.getMessage(description, null, currentLocale ?: Locale.getDefault()),
-                    timeout
-            )
-            CommandResponse(CommandAction.SEND_ROUND_DETAILS, round.toJson())
-        }
-    }
-
-    private fun processSetNick(command: CommandRequest, session: WebSocketSession?) =
+    private fun CommandRequest.processSetNick(session: WebSocketSession?) =
         session?.run {
-            val player = Player(id, command.payload ?: throw Exception())
+            val player = Player(id, payload ?: throw Exception())
             playerList.remove(player)
             playerList[player] = session
 
             sendPlayerListToHost()
             CommandResponse(CommandAction.SET_NICK_SUCCESS)
         }
+
+
+
+    private fun CommandRequest.processStartGame(): CommandResponse? {
+        gameSettings = deserialize<GameSettings>()?.apply {
+            currentLocale = Locale(locale)
+        }
+
+        var response: CommandResponse? = null
+        currentGameMode = GameMode.popRound(currentGameMode).apply {
+            println(first)
+            println(second)
+            response = second?.run {
+                CommandResponse(CommandAction.SEND_ROUND_DETAILS, Round(position,
+                        messageSource.getMessage(title, null, currentLocale ?: Locale.getDefault()),
+                        messageSource.getMessage(description, null, currentLocale ?: Locale.getDefault()),
+                        timeout
+                ).toJson())
+            }
+
+        }.first
+
+        return response
+    }
 
     private fun sendPlayerListToHost() {
         host?.apply {
