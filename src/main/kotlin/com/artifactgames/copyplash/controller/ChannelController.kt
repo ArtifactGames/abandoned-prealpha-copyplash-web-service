@@ -1,5 +1,6 @@
 package com.artifactgames.copyplash.controller
 
+import com.artifactgames.copyplash.datasource.Questions
 import com.artifactgames.copyplash.model.*
 import com.artifactgames.copyplash.type.CommandAction
 import org.springframework.beans.factory.annotation.Autowired
@@ -22,6 +23,9 @@ class ChannelController: TextWebSocketHandler() {
 
     @Autowired
     lateinit var gameModes: List<GameMode>
+
+    @Autowired
+    lateinit var questionsDataSource: Questions
 
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
@@ -89,12 +93,11 @@ class ChannelController: TextWebSocketHandler() {
     private fun CommandRequest.processStartGame(): CommandResponse? {
         gameSettings = deserialize<GameSettings>()?.apply {
             currentLocale = Locale(locale)
+            questionsDataSource.loadQuestionsByLocale(locale)
         }
 
         var response: CommandResponse? = null
         currentGameMode = GameMode.popRound(currentGameMode).apply {
-            println(first)
-            println(second)
             response = second?.run {
                 currentRound = Round(position,
                         messageSource.getMessage(title, null, currentLocale ?: Locale.getDefault()),
@@ -112,16 +115,19 @@ class ChannelController: TextWebSocketHandler() {
 
 
     private fun CommandRequest.processStartRound(): CommandResponse? {
-        CommandResponse(CommandAction.LAUNCH_ROUND, "[]").sendToPlayerList()
 
-        currentRound?.apply {
-            CommandResponse(CommandAction.UPDATE_COUNTER, timeout.toString()).sendTo(host)
-            timer("round-time",true, timeout, timeout, {
-                CommandResponse(CommandAction.ROUND_FINISH_HOST).sendTo(host)
-                CommandResponse(CommandAction.ROUND_FINISH_PLAYER).sendToPlayerList()
-                cancel()
-            })
-        }
+        val timeout = currentRound?.timeout ?: return null
+        val question = questionsDataSource.getQuestion() ?: return null
+
+        CommandResponse(CommandAction.LAUNCH_ROUND, question.toJson()).sendToPlayerList()
+        CommandResponse(CommandAction.UPDATE_COUNTER, timeout.toString()).sendTo(host)
+
+        timer("round-time",true, timeout, timeout, {
+            CommandResponse(CommandAction.ROUND_FINISH_HOST).sendTo(host)
+            CommandResponse(CommandAction.ROUND_FINISH_PLAYER).sendToPlayerList()
+            cancel()
+        })
+
         return null
     }
 
