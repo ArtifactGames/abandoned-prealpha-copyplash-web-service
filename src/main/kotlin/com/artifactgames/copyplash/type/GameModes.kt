@@ -2,7 +2,7 @@ package com.artifactgames.copyplash.type
 
 import com.google.gson.annotations.SerializedName
 
-enum class GameModes {
+enum class GameModes(mode: Int) {
     @SerializedName("0")
-    INSPIRATION,
+    INSPIRATION(0),
 }

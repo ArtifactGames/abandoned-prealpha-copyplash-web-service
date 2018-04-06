@@ -1,0 +1,13 @@
+[
+  {
+    "mode": 0,
+    "rounds": [
+      {
+        "position": 0,
+        "title": "round.one.title",
+        "description": "round.one.description",
+        "timeout": 60000
+      }
+    ]
+  }
+]

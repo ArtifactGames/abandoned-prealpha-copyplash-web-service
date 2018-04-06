@@ -1,26 +1,43 @@
 package com.artifactgames.copyplash.controller
 
-import com.artifactgames.copyplash.model.CommandRequest
-import com.artifactgames.copyplash.model.CommandResponse
-import com.artifactgames.copyplash.model.Player
-import com.artifactgames.copyplash.model.PlayerList
+import com.artifactgames.copyplash.datasource.Questions
+import com.artifactgames.copyplash.model.*
 import com.artifactgames.copyplash.type.CommandAction
-import com.google.gson.Gson
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.MessageSource
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
-import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
-import kotlin.collections.HashMap
+import java.util.*
+import javax.annotation.PostConstruct
+import kotlin.concurrent.timer
 
 @Component
 class ChannelController: TextWebSocketHandler() {
 
 
-    val gson = Gson()
+    @Autowired
+    lateinit var messageSource: MessageSource
+
+    @Autowired
+    lateinit var gameModes: List<GameMode>
+
+    @Autowired
+    lateinit var questionsDataSource: Questions
+
     var host: WebSocketSession? = null
     val playerList: HashMap<Player, WebSocketSession> = HashMap()
+    var gameSettings: GameSettings? = null
+    lateinit var currentGameMode: GameMode
+    var currentRound: Round? = null
+    var currentLocale: Locale? = null
+
+    @PostConstruct
+    fun init() {
+        currentGameMode = gameModes.getOrNull(0) ?: throw Exception("Default game mode not found")
+    }
 
     override fun handleTransportError(session: WebSocketSession?, exception: Throwable?) {
         println("Error: ${exception.toString()}")
@@ -47,77 +64,95 @@ class ChannelController: TextWebSocketHandler() {
 
     override fun handleMessage(session: WebSocketSession?, message: WebSocketMessage<*>?) {
         message
-                ?.mapMessageToCommandResponse()
-                ?.also {
-                    process(it, session)
-                }
-                ?.mapToCommandResponse()
-                ?.serialize()
-                ?.let {
-                    session?.sendMessage(it)
-                }
+                ?.mapMessageToCommandRequest()
+                ?.process(session)
+                ?.sendTo(session)
     }
 
-    private fun process(commandRequest: CommandRequest, session: WebSocketSession?) {
-        try {
-            commandRequest.getProcessor()(session)
-        } catch (e:Exception) {
-            e.printStackTrace();
-        }
-    }
-
-
-    private fun WebSocketMessage<*>.mapMessageToCommandResponse(): CommandRequest? =
-        try {
-            gson.fromJson(payload.toString(), CommandRequest::class.java)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-
-    private fun CommandRequest.getProcessor(): (session: WebSocketSession?) -> Any? =
+    private fun CommandRequest.process(session: WebSocketSession?): CommandResponse? = run {
         when(action) {
-            CommandAction.SET_NICK -> {session: WebSocketSession? ->
-                processSetNick(this, session)
-                sendPlayerListToHost()
-            }
-            else -> { _ -> }
+            CommandAction.SET_NICK -> processSetNick(session)
+            CommandAction.START_GAME -> processStartGame()
+            CommandAction.START_ROUND -> processStartRound()
+            else -> { null }
         }
+    }
+
+    private fun CommandRequest.processSetNick(session: WebSocketSession?) =
+        session?.run {
+            val player = Player(id, payload ?: throw Exception())
+            playerList.remove(player)
+            playerList[player] = session
+
+            sendPlayerListToHost()
+            CommandResponse(CommandAction.SET_NICK_SUCCESS)
+        }
+
+
+
+    private fun CommandRequest.processStartGame(): CommandResponse? {
+        gameSettings = deserialize<GameSettings>()?.apply {
+            currentLocale = Locale(locale)
+            questionsDataSource.loadQuestionsByLocale(locale)
+        }
+
+        var response: CommandResponse? = null
+        currentGameMode = GameMode.popRound(currentGameMode).apply {
+            response = second?.run {
+                currentRound = Round(position,
+                        messageSource.getMessage(title, null, currentLocale ?: Locale.getDefault()),
+                        messageSource.getMessage(description, null, currentLocale ?: Locale.getDefault()),
+                        timeout
+                )
+                CommandResponse(CommandAction.SEND_ROUND_DETAILS, currentRound.toJson())
+            }
+
+        }.first
+
+        return response
+    }
+
+
+
+    private fun CommandRequest.processStartRound(): CommandResponse? {
+
+        val timeout = currentRound?.timeout ?: return null
+        val question = questionsDataSource.getQuestion() ?: return null
+
+        CommandResponse(CommandAction.LAUNCH_ROUND, question.toJson()).sendToPlayerList()
+        CommandResponse(CommandAction.UPDATE_COUNTER, timeout.toString()).sendTo(host)
+
+        timer("round-time",true, timeout, timeout, {
+            CommandResponse(CommandAction.ROUND_FINISH_HOST).sendTo(host)
+            CommandResponse(CommandAction.ROUND_FINISH_PLAYER).sendToPlayerList()
+            cancel()
+        })
+
+        return null
+    }
 
     private fun sendPlayerListToHost() {
-        val updatePlayersResponse = CommandResponse(CommandAction.UPDATE_PLAYERS, PlayerList(playerList.getValidPlayers()).toJson())
-        val playerListTextMessage = TextMessage(updatePlayersResponse.toJson())
-        host!!.sendMessage(playerListTextMessage)
+        host?.apply {
+            val updatePlayersResponse = CommandResponse(
+                    CommandAction.UPDATE_PLAYERS,
+                    PlayerList(playerList.getValidPlayers()).toJson()
+            )
+            updatePlayersResponse.sendTo(this)
+        }
     }
 
     private fun HashMap<Player, WebSocketSession>.getValidPlayers(): List<Player> = this
-        .filterKeys { key -> key.nick.isNotEmpty() }
-        .keys
-        .toList()
+            .filterKeys { key -> key.nick.isNotEmpty() }
+            .keys
+            .toList()
 
-    private fun <T> T.toJson(): String = gson.toJson(this)
-
-    val processSetNick = {command: CommandRequest, session: WebSocketSession? ->
-        session?.run {
-            val player = Player(id, command.payload ?: throw Exception())
-            playerList.remove(player)
-            playerList[player] = session
-        }
+    private fun CommandResponse.sendTo(session: WebSocketSession?) = serialize()?.apply {
+        session?.sendMessage(this)
     }
 
-    private fun CommandRequest.mapToCommandResponse(): CommandResponse? =
-        when(action) {
-            CommandAction.SET_NICK -> CommandResponse(CommandAction.SET_NICK_SUCCESS)
-            else -> {
-                null
-            }
+    private fun CommandResponse.sendToPlayerList() = serialize()?.apply {
+        playerList.getValidPlayers().forEach {
+            playerList[it]?.sendMessage(this)
         }
-
-    private fun CommandResponse.serialize(): TextMessage? =
-        try {
-            TextMessage(gson.toJson(this))
-        } catch(e: Exception) {
-            null
-        }
-
+    }
 }
