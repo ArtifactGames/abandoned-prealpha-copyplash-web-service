@@ -1,4 +1,4 @@
-# Copyplash Web Service
+# (Abandoned) Copyplash Web Service
 
 A web service developed in Kotlin, with the Spring Boot Framework.
 
